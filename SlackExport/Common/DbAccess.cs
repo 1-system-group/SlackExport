@@ -31,7 +31,7 @@ namespace SlackExport.Common
                         command.Parameters.AddWithValue("@title", dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user);
                         command.Parameters.AddWithValue("@content", dataDto.message);
                         command.Parameters.AddWithValue("@post_date", dataDto.ts);
-                        command.Parameters.AddWithValue("@update_date", DateTime.Now);
+                        command.Parameters.AddWithValue("@update_date", dataDto.ts);
 
                         var result = command.ExecuteNonQuery();
                         if (result != 1)

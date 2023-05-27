@@ -452,11 +452,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\coral\\source\\repos\\SlackExport\\SlackExport\\SlackExport.csproj",
+      "projectUniqueName": "C:\\_develop\\SlackExport\\SlackExport\\SlackExport.csproj",
       "projectName": "SlackExport",
-      "projectPath": "C:\\Users\\coral\\source\\repos\\SlackExport\\SlackExport\\SlackExport.csproj",
+      "projectPath": "C:\\_develop\\SlackExport\\SlackExport\\SlackExport.csproj",
       "packagesPath": "C:\\Users\\coral\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\coral\\source\\repos\\SlackExport\\SlackExport\\obj\\",
+      "outputPath": "C:\\_develop\\SlackExport\\SlackExport\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\coral\\AppData\\Roaming\\NuGet\\NuGet.Config",

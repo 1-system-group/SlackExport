@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "NAlL4nrMl0wjlZRImx5ArutcFnCH3f95M2TZ6RCQ9HO78aRDdtYpudoO58+bhPSaMslY8UIcruU05+WyVaBFCw==",
+  "dgSpecHash": "W9Uvd5A/MsRE6GnAqt4UpRP5dqSrbju4tbZflwKqzTV+uygNs/jRdM/EhznZmYjgLbFVfRFGWBdcVlCznQZMGQ==",
   "success": true,
-  "projectFilePath": "C:\\Users\\coral\\source\\repos\\SlackExport\\SlackExport\\SlackExport.csproj",
+  "projectFilePath": "C:\\_develop\\SlackExport\\SlackExport\\SlackExport.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\coral\\.nuget\\packages\\microsoft.win32.systemevents\\7.0.0\\microsoft.win32.systemevents.7.0.0.nupkg.sha512",
     "C:\\Users\\coral\\.nuget\\packages\\mysqlconnector\\2.2.6\\mysqlconnector.2.2.6.nupkg.sha512",
