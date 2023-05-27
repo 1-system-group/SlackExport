@@ -30,7 +30,7 @@ namespace SlackExport.Common
                         // タイトルは「チャンネル名 + 日時 + ユーザ名」の形式にする
                         command.Parameters.AddWithValue("@title", dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user);
                         command.Parameters.AddWithValue("@content", dataDto.message);
-                        command.Parameters.AddWithValue("@post_date", DateTime.Now);
+                        command.Parameters.AddWithValue("@post_date", dataDto.ts);
                         command.Parameters.AddWithValue("@update_date", DateTime.Now);
 
                         var result = command.ExecuteNonQuery();

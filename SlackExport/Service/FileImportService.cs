@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.IO;
+﻿using System.Configuration;
 using System.Text;
 using System.Web;
 using Newtonsoft.Json.Linq;
@@ -189,7 +186,7 @@ namespace SlackExport.Service
         // ※ 現時点では未実装
         private void GithubInfoRegist(FileDto fileDto)
         {
-  
+
         }
     }
 }
