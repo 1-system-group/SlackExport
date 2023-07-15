@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SlackExport": {
+      "commandName": "Project",
+      "commandLineArgs": "1"
+    }
+  }
+}
