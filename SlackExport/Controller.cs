@@ -6,6 +6,8 @@ namespace SlackExport
     {
         private const string FileImport = "1";
 
+        private const string FileExport = "2";
+
         public void Execute(string param)
         {
             // コマンドライン引数で呼び出す機能を分岐する予定
@@ -13,8 +15,13 @@ namespace SlackExport
             {
                 // ファイルをDBにインポートする
                 case FileImport:
-                    var service = new FileImportService();
-                    service.Execute();
+                    var fileImportService = new FileImportService();
+                    fileImportService.Execute();
+                    break;
+                // ファイルをS3にエクスポートする
+                case FileExport:
+                    var fileExportService = new FileExportService();
+                    fileExportService.Execute();
                     break;
                 default:
                     break;

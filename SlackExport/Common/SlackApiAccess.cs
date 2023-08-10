@@ -1,6 +1,11 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.Configuration;
+using System.Globalization;
+using Newtonsoft.Json.Linq;
 using NLog;
 using SlackExport.Dto;
+using System.IO.Compression;
 
 
 namespace SlackExport.Common
@@ -13,9 +18,15 @@ namespace SlackExport.Common
         private static readonly string HISTORY_URL = "https://slack.com/api/conversations.history";
         private static readonly string USER_URL = "https://slack.com/api/users.info";
 
-        private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Local);
+        // TODO:App.configに移す想定
+        private static readonly string ROOT_PATH = "./work";
 
-        public Dictionary<string, List<DataDto>> Export(string token)
+        private static readonly string EXPORT_NAME = "第一システム部（仮） Slack export";
+
+
+        // タイムゾーンは、SlackからはUTCで取れるので、これを指定しておく
+        private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+        public void Export(string token)
         {
             // チャンネル一覧を取得する
             // https://slack.com/api/conversations.list
@@ -23,9 +34,7 @@ namespace SlackExport.Common
 
             // チャンネルごとの投稿内容を取得する
             // https://slack.com/api/conversations.history
-            var dataList = GetMessage(channelDtoList, token);
-
-            return dataList;
+            GetMessage(channelDtoList, token);
         }
 
         private List<ChannelDto> GetThreadId(string token)
@@ -52,55 +61,80 @@ namespace SlackExport.Common
             return channelDtoList;
         }
 
-        private Dictionary<string, List<DataDto>> GetMessage(List<ChannelDto> list, string token)
-        {
 
-            var dataDic = new Dictionary<string, List<DataDto>>();
+        private void GetMessage(List<ChannelDto> list, string token)
+        {
+            CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-US");
+            var startDate = DateTime.MaxValue;
+            var endDate = DateTime.MinValue;
+
             var httpAccess = new HttpAccess();
 
             foreach (var channel in list)
             {
-                var dataList = new List<DataDto>();
 
-                var historyUrl = HISTORY_URL + "?channel=" + channel.channnelId + "&limit=100";
+                // 「tmp」フォルダを作成して、その中にチャンネルごとのフォルダを作る
+                Directory.CreateDirectory(ROOT_PATH + Path.DirectorySeparatorChar + "tmp" + Path.DirectorySeparatorChar + channel.channnelName);
 
-                var historyResponse = httpAccess.get(historyUrl, token);
-                var historyJson = JObject.Parse(historyResponse);
+                // 〇日前まで取得対象にする
+                int daysAgo = int.Parse(ConfigurationManager.AppSettings["daysAgo"]);
+                var today = DateTime.Now;
 
-                if (historyJson.Count <= 0)
+                // 本日からdaysAgoの日数分、1日分ずつ遡って取得していく
+                for (int i = 0; i <= daysAgo; i++)
                 {
-                    logger.Info("レスポンスなし");
-                    break;
+                    var targetDay = today.AddDays(i * -1);
+
+                    // 指定日の0時から23時59分59秒までを取得対象にする
+                    var startDate2 = DateTime.Parse(targetDay.ToString("yyyy/MM/dd") + " 00:00:00");
+                    var endDate2 = DateTime.Parse(targetDay.ToString("yyyy/MM/dd") + " 23:59:59");
+                    // UNIX時間に変換する
+                    var startUnixTime = (startDate2.ToUniversalTime() - unixEpoch).TotalSeconds;
+                    var endUnixTime = (endDate2.ToUniversalTime() - unixEpoch).TotalSeconds;
+
+                    var historyUrl = HISTORY_URL + "?channel=" + channel.channnelId + "&limit=100" + "&latest=" + endUnixTime + "&oldest=" + startUnixTime;
+                    var historyResponse = httpAccess.get(historyUrl, token);
+                    var historyJson = JObject.Parse(historyResponse);
+
+                    if (historyJson.Count <= 0)
+                    {
+                        logger.Info("レスポンスなし");
+                        break;
+                    }
+
+                    // messagesがあったらファイルに書き出す
+                    var message = historyJson["messages"];
+                    if ((message != null) &&
+                        (message.ToString() != null) &&
+                        (message.ToString() != "[]"))
+                    {
+                        File.AppendAllText(ROOT_PATH + Path.DirectorySeparatorChar + "tmp" + Path.DirectorySeparatorChar + channel.channnelName + Path.DirectorySeparatorChar + targetDay.ToString("yyyy-MM-dd") + ".json", message.ToString());
+
+                        // フォルダ名に取得した投稿の開始日と終了日を入れるため、
+                        // 取得対象範囲日の中から、
+                        // 実際に投稿を取得できた日時の開始日と終了日を覚えておく
+                        if (startDate.CompareTo(targetDay) > 0)
+                        {
+                            startDate = targetDay;
+                        }
+                        if (endDate.CompareTo(targetDay) < 0)
+                        {
+                            endDate = targetDay;
+                        }
+                    }
                 }
-
-                var message = historyJson["messages"];
-                var child = message.Children();
-                foreach (var value in child)
-                {
-                    var data = new DataDto();
-
-                    data.thread = channel.channnelName;
-                    var ts = value["ts"].ToString();
-                    // tsは"1234567890.123456"のような形式で渡されてくるが、
-                    // 年月日時分秒まであればいい（加えてミリ秒以下は扱いが面倒な）ので、小数点以下は除外する。
-                    double doubleTs = 0;
-                    double.TryParse(ts, out doubleTs);
-                    data.ts = unixEpoch.AddMilliseconds(doubleTs).ToLocalTime().ToString();
-
-                    // ユーザIDからユーザ名を取得する
-                    var userUrl = USER_URL + "?user=" + value["user"].ToString();
-                    var userResponse = httpAccess.get(userUrl, token);
-                    var userJson = JObject.Parse(userResponse);
-                    var user = userJson["user"];
-                    var name = user["real_name"].ToString();
-
-                    data.message = value["text"].ToString();
-                    data.user = name;
-                    dataList.Add(data);
-                }
-                dataDic.Add(channel.channnelId, dataList);
             }
-            return dataDic;
+            var startDateStr = startDate.ToString("MMM dd yyyy");
+            var endDateStr = endDate.ToString("MMM dd yyyy");
+
+            // 「tmp」フォルダを「第一システム部（仮） Slack export MMM dd yyyy - MMM dd yyyy」の形式のフォルダにリネームする
+            string oldDir = ROOT_PATH + Path.DirectorySeparatorChar + "tmp";
+            string newDir = ROOT_PATH + Path.DirectorySeparatorChar + EXPORT_NAME + " " + startDateStr + " - " + endDateStr;
+            Directory.Move(oldDir, newDir);
+            // Zip圧縮する
+            ZipFile.CreateFromDirectory(newDir, newDir + ".zip");
+            // フォルダは消してZipファイルだけ残す
+            Directory.Delete(newDir, true);
         }
     }
 }
