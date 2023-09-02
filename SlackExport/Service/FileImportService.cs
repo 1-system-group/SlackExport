@@ -16,8 +16,12 @@ namespace SlackExport.Service
 
         private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Local);
 
-        private Dictionary<string, string> userMap = new Dictionary<string, string>();
-
+        // key:ユーザID、value:ユーザ名
+        // インポートファイル読み込みの過程でユーザ情報が取得できたら、この辞書に積んでいく
+        private Dictionary<string, string> userDec = new Dictionary<string, string>();
+        // key:ユーザID、value:ユーザ名
+        // SlackAPIでユーザ情報を取得したモノ
+        private Dictionary<string, string> userInfoDec = null;
 
         public void Execute()
         {
@@ -140,24 +144,33 @@ namespace SlackExport.Service
                             // そのケースがあった時のために、
                             // real_nameが取得できた場合は、
                             // userとdisplay_nameを紐付けて保持しておく
-                            if (!userMap.ContainsKey(user))
+                            if (!userDec.ContainsKey(user))
                             {
-                                userMap.Add(user, name);
+                                userDec.Add(user, name);
                             }
                         }
-                        // 同じ人が連投の場合、user_profileがないので、
-                        // 保持しておいたuserからreal_nameを取得する
                         else
                         {
-                            if (userMap.ContainsKey(user))
+                            // 同じ人が連投の場合、user_profileがないので、
+                            // 保持しておいたuserからreal_nameを取得する
+                            if (userDec.ContainsKey(user))
                             {
-                                name = userMap[user];
+                                name = userDec[user];
                             }
-                            // 保持しておいたuserに見つからなければuserを使う。
-                            // ※ 「○○さんがチャンネルに参加しました」くらいだと思う。
                             else
                             {
-                                name = user;
+                                // 保持しておいたuserにも見つからない場合、
+                                // SlackAPIからユーザ名を取得する
+                                string slackApiName = getUserFromSlack(user);
+                                if (slackApiName != string.Empty)
+                                {
+                                    name = slackApiName;
+                                }
+                                // SlackAPIに問い合わせても見つからなければuserを使う。
+                                else 
+                                {
+                                    name = user;
+                                }
                             }
                         }
 
@@ -187,6 +200,29 @@ namespace SlackExport.Service
         private void GithubInfoRegist(FileDto fileDto)
         {
 
+        }
+
+
+        private string getUserFromSlack(string userId)
+        {
+            string userName = string.Empty;
+
+            // SlackAPIに問い合わせしていなければ問い合わせる
+            // SlackAPIを飛ばさずに済むなら飛ばしたくないので、
+            // 問い合わせが必要になるまはせず、
+            // あらかじめ問い合わせておくようなことはしない
+            if (userInfoDec == null)
+            {
+                string token = ConfigurationManager.AppSettings["token"];
+                var slackApiAccess = new SlackApiAccess();
+                userInfoDec = slackApiAccess.GetUserInfo(token);
+            }
+
+            if (userInfoDec.ContainsKey(userId))
+            {
+                userName = userInfoDec[userId];
+            }
+            return userName;
         }
     }
 }
