@@ -1,6 +1,13 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.Configuration;
+using System.Globalization;
+using Newtonsoft.Json.Linq;
 using NLog;
 using SlackExport.Dto;
+using System.IO.Compression;
+using System.Threading.Channels;
+using Amazon;
 
 
 namespace SlackExport.Common
@@ -11,24 +18,20 @@ namespace SlackExport.Common
 
         private static readonly string LIST_URL = "https://slack.com/api/conversations.list";
         private static readonly string HISTORY_URL = "https://slack.com/api/conversations.history";
-        private static readonly string USER_URL = "https://slack.com/api/users.info";
+        private static readonly string USER_INFO_URL = "https://slack.com/api/users.info";
+        private static readonly string USER_INFO_LIST = "https://slack.com/api/users.list";
 
-        private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Local);
+        // TODO:App.configに移す想定
+        private static readonly string ROOT_PATH = "./work";
 
-        public Dictionary<string, List<DataDto>> Export(string token)
-        {
-            // チャンネル一覧を取得する
-            // https://slack.com/api/conversations.list
-            var channelDtoList = GetThreadId(token);
+        private static readonly string EXPORT_NAME = "第一システム部（仮） Slack export";
 
-            // チャンネルごとの投稿内容を取得する
-            // https://slack.com/api/conversations.history
-            var dataList = GetMessage(channelDtoList, token);
 
-            return dataList;
-        }
+        // タイムゾーンは、SlackからはUTCで取れるので、これを指定しておく
+        private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
 
-        private List<ChannelDto> GetThreadId(string token)
+
+        public List<ChannelDto> GetThreadId(string token)
         {
             var channelDtoList = new List<ChannelDto>();
             var httpAccess = new HttpAccess();
@@ -52,55 +55,65 @@ namespace SlackExport.Common
             return channelDtoList;
         }
 
-        private Dictionary<string, List<DataDto>> GetMessage(List<ChannelDto> list, string token)
+        public Dictionary<string, string> GetUserInfo(String token)
         {
-
-            var dataDic = new Dictionary<string, List<DataDto>>();
             var httpAccess = new HttpAccess();
+            var response = httpAccess.get(USER_INFO_LIST, token);
+            var userJson = JObject.Parse(response);
 
-            foreach (var channel in list)
+            var ok = userJson["ok"];
+            if (!Convert.ToBoolean(ok.ToString()))
             {
-                var dataList = new List<DataDto>();
-
-                var historyUrl = HISTORY_URL + "?channel=" + channel.channnelId + "&limit=100";
-
-                var historyResponse = httpAccess.get(historyUrl, token);
-                var historyJson = JObject.Parse(historyResponse);
-
-                if (historyJson.Count <= 0)
-                {
-                    logger.Info("レスポンスなし");
-                    break;
-                }
-
-                var message = historyJson["messages"];
-                var child = message.Children();
-                foreach (var value in child)
-                {
-                    var data = new DataDto();
-
-                    data.thread = channel.channnelName;
-                    var ts = value["ts"].ToString();
-                    // tsは"1234567890.123456"のような形式で渡されてくるが、
-                    // 年月日時分秒まであればいい（加えてミリ秒以下は扱いが面倒な）ので、小数点以下は除外する。
-                    double doubleTs = 0;
-                    double.TryParse(ts, out doubleTs);
-                    data.ts = unixEpoch.AddMilliseconds(doubleTs).ToLocalTime().ToString();
-
-                    // ユーザIDからユーザ名を取得する
-                    var userUrl = USER_URL + "?user=" + value["user"].ToString();
-                    var userResponse = httpAccess.get(userUrl, token);
-                    var userJson = JObject.Parse(userResponse);
-                    var user = userJson["user"];
-                    var name = user["real_name"].ToString();
-
-                    data.message = value["text"].ToString();
-                    data.user = name;
-                    dataList.Add(data);
-                }
-                dataDic.Add(channel.channnelId, dataList);
+                return new Dictionary<string, string>();
             }
-            return dataDic;
+
+            var userInfoDec = new Dictionary<string, string>();
+            var members = userJson["members"];
+            foreach (var member in members)
+            {
+                var id = member["id"];
+                var name = member["name"];
+
+                var profile = member["profile"];
+                var displayName = profile["display_name"];
+                userInfoDec.Add(id.ToString(), displayName.ToString());
+            }
+            return userInfoDec;
+        }
+
+
+        public string GetMessage(ChannelDto channelDto, DateTime startDate, DateTime endDate, string token)
+        {
+            CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture("en-US");
+
+            // UNIX時間に変換する
+            var startUnixTime = (startDate.ToUniversalTime() - unixEpoch).TotalSeconds;
+            var endUnixTime = (endDate.ToUniversalTime() - unixEpoch).TotalSeconds;
+
+            var httpAccess = new HttpAccess();
+            var historyUrl = HISTORY_URL + "?channel=" + channelDto.channnelId + "&limit=100" + "&latest=" + endUnixTime + "&oldest=" + startUnixTime;
+            var response = httpAccess.get(historyUrl, token);
+            var historyJson = JObject.Parse(response);
+
+            if (historyJson.Count <= 0)
+            {
+                logger.Info("レスポンスなし。チャンネルID：" + channelDto.channnelId + " 取得範囲：" + startDate + " - " + endDate);
+                return string.Empty;
+            }
+
+            var ok = historyJson["ok"];
+            if (!Convert.ToBoolean(ok.ToString()))
+            {
+                return string.Empty;
+            }
+
+            // messagesがあったらファイルに書き出す
+            var message = historyJson["messages"];
+            if (message.ToString() == "[]")
+            {
+                return string.Empty;
+            }
+            return message.ToString();
         }
     }
 }
