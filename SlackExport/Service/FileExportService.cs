@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
+﻿using System.Configuration;
 using System.Globalization;
 using System.IO.Compression;
-using System.Linq;
-using System.Text;
-using System.Threading.Channels;
-using System.Threading.Tasks;
+using System.IO;
 using SlackExport.Common;
 
 namespace SlackExport.Service
@@ -81,7 +76,12 @@ namespace SlackExport.Service
 
             // 「tmp」フォルダを「第一システム部（仮） Slack export MMM dd yyyy - MMM dd yyyy」の形式のフォルダにリネームする
             string oldDir = ROOT_PATH + Path.DirectorySeparatorChar + "tmp";
-            string newDir = ROOT_PATH + Path.DirectorySeparatorChar + EXPORT_NAME + " " + startDateStr + " - " + endDateStr;
+            string newDir = ROOT_PATH + 
+                            Path.DirectorySeparatorChar + EXPORT_NAME + 
+                            " " + 
+                            startDateStr + 
+                            " - " + 
+                            endDateStr;
             string zipDir = newDir + ".zip";
 
             Directory.Move(oldDir, newDir);
@@ -95,13 +95,19 @@ namespace SlackExport.Service
             // フォルダは消してZipファイルだけ残す
             Directory.Delete(newDir, true);
 
-            // S3アクセス用の残骸です。いったん無視してください。
-            /*
-            AmazonS3Service amazonS3Service = new AmazonS3Service();
+            AmazonS3Access amazonS3Service = new AmazonS3Access();
 
-            string bucketName = "1-system-group-slack-history";
-            amazonS3Service.UploadFile(bucketName, filePath);
-            */
+            // S3アクセスにZipファイルをエクスポートする。
+            // （オブジェクトキーとオブジェクト名の区切りは、"/"である必要があるみたいで、
+            //   Path.DirectorySeparatorCharでもUnix系で動かすなら問題ないと思いますが、
+            //   一応明示的に"/"を指定するようにします）
+            amazonS3Service.UploadFile(Path.GetFullPath(zipDir),
+                                            ConfigurationManager.AppSettings["awsBucketName"],
+                                            ConfigurationManager.AppSettings["awsObjectPath"] + 
+                                            "/" + 
+                                            Path.GetFileName(zipDir));
+            // エクスポートできたらローカルのZipファイルを消す
+            File.Delete(zipDir);
         }
     }
 }

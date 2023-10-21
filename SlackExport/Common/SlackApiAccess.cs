@@ -1,13 +1,7 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
-using System.Configuration;
-using System.Globalization;
+﻿using System.Globalization;
 using Newtonsoft.Json.Linq;
 using NLog;
 using SlackExport.Dto;
-using System.IO.Compression;
-using System.Threading.Channels;
-using Amazon;
 
 
 namespace SlackExport.Common
@@ -90,30 +84,39 @@ namespace SlackExport.Common
             var startUnixTime = (startDate.ToUniversalTime() - unixEpoch).TotalSeconds;
             var endUnixTime = (endDate.ToUniversalTime() - unixEpoch).TotalSeconds;
 
-            var httpAccess = new HttpAccess();
-            var historyUrl = HISTORY_URL + "?channel=" + channelDto.channnelId + "&limit=100" + "&latest=" + endUnixTime + "&oldest=" + startUnixTime;
-            var response = httpAccess.get(historyUrl, token);
-            var historyJson = JObject.Parse(response);
-
-            if (historyJson.Count <= 0)
+            // github通知でたまにJSONにパースできないパターンなどがあるみたいなので、
+            // 広めにSlackAPIアクセスからtryで囲っておいて、エラーだったら諦めるようにする。
+            try
             {
-                logger.Info("レスポンスなし。チャンネルID：" + channelDto.channnelId + " 取得範囲：" + startDate + " - " + endDate);
+                var httpAccess = new HttpAccess();
+                var historyUrl = HISTORY_URL + "?channel=" + channelDto.channnelId + "&limit=100" + "&latest=" + endUnixTime + "&oldest=" + startUnixTime;
+                var response = httpAccess.get(historyUrl, token);
+                var historyJson = JObject.Parse(response);
+
+                if (historyJson.Count <= 0)
+                {
+                    logger.Info("レスポンスなし。チャンネルID：" + channelDto.channnelId + " 取得範囲：" + startDate + " - " + endDate);
+                    return string.Empty;
+                }
+
+                var ok = historyJson["ok"];
+                if (!Convert.ToBoolean(ok.ToString()))
+                {
+                    return string.Empty;
+                }
+
+                // messagesがあったらファイルに書き出す
+                var message = historyJson["messages"];
+                if (message.ToString() == "[]")
+                {
+                    return string.Empty;
+                }
+                return message.ToString();
+            } catch (Exception ex)
+            {
+                logger.Warn(ex.StackTrace);
                 return string.Empty;
             }
-
-            var ok = historyJson["ok"];
-            if (!Convert.ToBoolean(ok.ToString()))
-            {
-                return string.Empty;
-            }
-
-            // messagesがあったらファイルに書き出す
-            var message = historyJson["messages"];
-            if (message.ToString() == "[]")
-            {
-                return string.Empty;
-            }
-            return message.ToString();
         }
     }
 }
