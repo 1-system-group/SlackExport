@@ -24,6 +24,7 @@ namespace SlackExport
                     fileExportService.Execute();
                     break;
                 default:
+                    Console.WriteLine("引数が対象外です：" + param);
                     break;
             }
         }
