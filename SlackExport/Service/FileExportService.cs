@@ -19,9 +19,11 @@ namespace SlackExport.Service
         public FileExportService() { }
 
 
-        public void Execute() {
+        public void Execute()
+        {
 
-            string token = ConfigurationManager.AppSettings["token"];
+            string token = Environment.GetEnvironmentVariable("SLACK_TOKEN");
+
             var slackApiAccess = new SlackApiAccess();
             var channelDtoList = slackApiAccess.GetThreadId(token);
 
@@ -53,7 +55,7 @@ namespace SlackExport.Service
                     var message = slackApiAccess.GetMessage(channel, startDate2, endDate2, token);
                     if (message != string.Empty)
                     {
- 
+
                         File.AppendAllText(ROOT_PATH + Path.DirectorySeparatorChar + "tmp" + Path.DirectorySeparatorChar + channel.channnelName + Path.DirectorySeparatorChar + targetDay.ToString("yyyy-MM-dd") + ".json", message.ToString());
 
                         // フォルダ名に取得した投稿の開始日と終了日を入れるため、
@@ -76,11 +78,11 @@ namespace SlackExport.Service
 
             // 「tmp」フォルダを「第一システム部（仮） Slack export MMM dd yyyy - MMM dd yyyy」の形式のフォルダにリネームする
             string oldDir = ROOT_PATH + Path.DirectorySeparatorChar + "tmp";
-            string newDir = ROOT_PATH + 
-                            Path.DirectorySeparatorChar + EXPORT_NAME + 
-                            " " + 
-                            startDateStr + 
-                            " - " + 
+            string newDir = ROOT_PATH +
+                            Path.DirectorySeparatorChar + EXPORT_NAME +
+                            " " +
+                            startDateStr +
+                            " - " +
                             endDateStr;
             string zipDir = newDir + ".zip";
 
@@ -103,8 +105,8 @@ namespace SlackExport.Service
             //   一応明示的に"/"を指定するようにします）
             amazonS3Service.UploadFile(Path.GetFullPath(zipDir),
                                             ConfigurationManager.AppSettings["awsBucketName"],
-                                            ConfigurationManager.AppSettings["awsObjectPath"] + 
-                                            "/" + 
+                                            ConfigurationManager.AppSettings["awsObjectPath"] +
+                                            "/" +
                                             Path.GetFileName(zipDir));
             // エクスポートできたらローカルのZipファイルを消す
             File.Delete(zipDir);

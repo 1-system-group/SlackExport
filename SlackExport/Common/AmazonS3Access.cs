@@ -1,4 +1,5 @@
 ﻿using System.Configuration;
+using Amazon;
 using Amazon.Runtime.CredentialManagement;
 using Amazon.S3;
 using Amazon.S3.Transfer;
@@ -10,27 +11,15 @@ namespace SlackExport.Common
         private AmazonS3Client client;
         public AmazonS3Access()
         {
+            string awsAccessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
+            string awsSecretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
+            var amazonS3Config = new AmazonS3Config();
+            amazonS3Config.ServiceURL = "https://s3.amazonaws.com";
 
-            // ～ユーザ/.aws/credentials
-            // にアクセスキーとシークレットキーを持ったプロファイルが存在していることが前提になります
-            string profileName = ConfigurationManager.AppSettings["awsCliProfile"];
-            var credentilasFile = new SharedCredentialsFile();
-
-            CredentialProfile profile = null;
-            if (credentilasFile.TryGetProfile(profileName, out profile) == false)
-            {
-                System.Diagnostics.Debug.WriteLine("プロファイル名は存在しません。");
-                return;
-            }
-
-            Amazon.Runtime.AWSCredentials awsCredentials = null;
-            if (AWSCredentialsFactory.TryGetAWSCredentials(profile, credentilasFile, out awsCredentials) == false)
-            {
-                System.Diagnostics.Debug.WriteLine("認証情報の生成に失敗しました。");
-                return;
-            }
-
-            client = new AmazonS3Client(awsCredentials, profile.Region);
+            // RegionEndpointを指定すると、
+            // uploadする際にエンドポイントを利用するようにと言われてエラーになるので、
+            // エンドポイント（ServiceURL）指定にする 
+            client = new AmazonS3Client(awsAccessKeyId, awsSecretAccessKey, amazonS3Config);
 
         }
 
