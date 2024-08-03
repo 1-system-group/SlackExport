@@ -15,18 +15,24 @@ namespace SlackExport
         public static void Main(string[] args)
         {
             logger.Info("処理開始");
+            Console.WriteLine("処理開始");
 
+            string param1 = args[0];
+            string? param2 = null;
             if (args.Length == 0)
             {
                 logger.Info("引数エラー");
             }
-            string param = args[0];
+            else if (args.Length == 2)
+            {
+                param2 = args[1];
+            }
 
             var controller = new Controller();
-            controller.Execute(param);
+            controller.Execute(param1, param2);
 
             logger.Info("処理終了");
-
+            Console.WriteLine("処理終了");
         }
     }
 }
