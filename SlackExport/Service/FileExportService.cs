@@ -1,7 +1,7 @@
 ﻿using System.Configuration;
 using System.Globalization;
 using System.IO.Compression;
-using System.IO;
+using NLog;
 using SlackExport.Common;
 
 namespace SlackExport.Service
@@ -15,6 +15,8 @@ namespace SlackExport.Service
 
         // タイムゾーンは、SlackからはUTCで取れるので、これを指定しておく
         private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+
+        public static Logger logger = LogManager.GetCurrentClassLogger();
 
         public FileExportService() { }
 
@@ -108,6 +110,9 @@ namespace SlackExport.Service
                                             ConfigurationManager.AppSettings["awsObjectPath"] +
                                             "/" +
                                             Path.GetFileName(zipDir));
+            Console.WriteLine("エクスポートしたファイルを格納しました：" + zipDir);
+            logger.Info("エクスポートしたファイルを格納しました：" + zipDir);
+
             // エクスポートできたらローカルのZipファイルを消す
             File.Delete(zipDir);
         }
