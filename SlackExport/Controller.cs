@@ -9,10 +9,6 @@ namespace SlackExport
 
         private const string ArgumentTypFileExport = "2";
 
-        private const string ArgumentTypFileImportTargetDay = "11";
-
-        private const string ArgumentTypFileExportTargetDay = "21";
-
         public static Logger logger = LogManager.GetCurrentClassLogger();
 
         public void Execute(string param1, string? param2)
@@ -22,19 +18,11 @@ namespace SlackExport
             {
                 // ファイルをDBにインポートする
                 case ArgumentTypFileImport:
-                    FileImport();
+                    FileImport(param2);
                     break;
                 // ファイルをS3にエクスポートする
                 case ArgumentTypFileExport:
-                    FileExport();
-                    break;
-                // ファイルをDBにインポートする（日指定）
-                case ArgumentTypFileImportTargetDay:
-                    FileImportTargetDay(param2);
-                    break;
-                // ファイルをS3にエクスポートする（日指定）
-                case ArgumentTypFileExportTargetDay:
-                    FileExportTargetDay(param2);
+                    FileExport(param2);
                     break;
                 default:
                     Console.WriteLine("引数が対象外です：" + param1);
@@ -42,50 +30,53 @@ namespace SlackExport
             }
         }
 
-        private void FileImport()
-        {
-            var fileImportService = new FileImportService();
-            fileImportService.Execute();
-
-        }
-
-        private void FileExport()
-        {
-            var fileExportService = new FileExportService();
-            fileExportService.Execute();
-        }
-
-
-        private void FileImportTargetDay(string? targetDay)
+        private void FileImport(string? targetDay)
         {
             // 現在日時を取得して、
             // コマンドライン引数で受け取った対象日付と一致していたら実行する
             var day = DateTime.Now.Day;
-            if ((targetDay != null) && (int.Parse(targetDay) == day))
+            if (targetDay == null)
             {
                 var fileImportService = new FileImportService();
                 fileImportService.Execute();
-            } else
+            }
+            else
             {
-                Console.WriteLine("指定日と異なるため実行しません：" + targetDay);
-                logger.Info("指定日と異なるため実行しません：" + targetDay);
+                if (int.Parse(targetDay) == day)
+                {
+                    var fileImportService = new FileImportService();
+                    fileImportService.Execute();
+                }
+                else
+                {
+                    Console.WriteLine("指定日と異なるため実行しません：" + targetDay);
+                    logger.Info("指定日と異なるため実行しません：" + targetDay);
+                }
             }
         }
 
-        private void FileExportTargetDay(string? targetDay)
+        private void FileExport(string? targetDay)
         {
             // 現在日時を取得して、
             // コマンドライン引数で受け取った対象日付と一致していたら実行する
             var day = DateTime.Now.Day;
-            if ((targetDay != null) && (int.Parse(targetDay) == day))
+            if (targetDay == null)
             {
                 var fileExportService = new FileExportService();
                 fileExportService.Execute();
             }
             else
             {
-                Console.WriteLine("指定日と異なるため実行しません：" + targetDay);
-                logger.Info("指定日と異なるため実行しません：" + targetDay);
+                if (int.Parse(targetDay) == day)
+                {
+                    var fileExportService = new FileExportService();
+                    fileExportService.Execute();
+                }
+                else
+                {
+                    Console.WriteLine("指定日と異なるため実行しません：" + targetDay);
+                    logger.Info("指定日と異なるため実行しません：" + targetDay);
+                }
             }
         }
     }
