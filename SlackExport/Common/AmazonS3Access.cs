@@ -28,5 +28,12 @@ namespace SlackExport.Common
             TransferUtility fileTransferUtility = new TransferUtility(client);
             fileTransferUtility.Upload(filePath, bucketName, objectKey);
         }
+
+        public void DownLoadFile(string localPath, string bucketName, string objectKey)
+        {
+            TransferUtility fileTransferUtility = new TransferUtility(client);
+
+            fileTransferUtility.DownloadDirectory(bucketName, objectKey, localPath);
+        }
     }
 }

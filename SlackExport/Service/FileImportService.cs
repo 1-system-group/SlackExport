@@ -1,4 +1,5 @@
 ﻿using System.Configuration;
+using System.IO.Compression;
 using System.Text;
 using System.Web;
 using Newtonsoft.Json.Linq;
@@ -16,6 +17,11 @@ namespace SlackExport.Service
 
         private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Local);
 
+        // S3からインポートファイルをダウンロードしてきた際のテンポラリ置き場
+        private static readonly string S3_DOWNLOAD_TEMPORARY_PATH = "./importwork";
+        // S3のzipファイルを解凍したもののテンポラリ置き場
+        private static readonly string S3_DOWNLOAD_TEMPORARY_PATH_DECOMPRESS = S3_DOWNLOAD_TEMPORARY_PATH + Path.DirectorySeparatorChar + "discompress";
+
         // key:ユーザID、value:ユーザ名
         // インポートファイル読み込みの過程でユーザ情報が取得できたら、この辞書に積んでいく
         private Dictionary<string, string> userDec = new Dictionary<string, string>();
@@ -25,11 +31,22 @@ namespace SlackExport.Service
 
         public void Execute()
         {
-            string path = ConfigurationManager.AppSettings["importFilePath"];
+
+            // S3からダウンロードしてきたファイルを格納するパスを作成
+            Directory.CreateDirectory(S3_DOWNLOAD_TEMPORARY_PATH);
+            // S3からダウンロード
+            AmazonS3Access amazonS3Service = new AmazonS3Access();
+            amazonS3Service.DownLoadFile(
+                                S3_DOWNLOAD_TEMPORARY_PATH,
+                                ConfigurationManager.AppSettings["awsBucketName"],
+                                ConfigurationManager.AppSettings["awsObjectPath"]);
+           
+            // ダウンロードしてきたファイルを全て解凍する
+            DecompressionDirectory(S3_DOWNLOAD_TEMPORARY_PATH, S3_DOWNLOAD_TEMPORARY_PATH_DECOMPRESS);
 
             var fileDtoList = new List<FileDto>();
             // ファイル格納パスを読み込んで、ファイルのリストを作成する
-            Read("", path, fileDtoList);
+            Read("", S3_DOWNLOAD_TEMPORARY_PATH_DECOMPRESS, fileDtoList);
 
             // ファイルリストを1つずつ読み込んでインポートしていく
             foreach (var fileDto in fileDtoList)
@@ -50,6 +67,19 @@ namespace SlackExport.Service
                 {
                     logger.Info("スキップします。：" + fileDto.channnelName);
                 }
+            }
+            // S3からダウンロードしてきたファイルを格納するパス（解凍した分も含めて）を削除
+            Directory.Delete(S3_DOWNLOAD_TEMPORARY_PATH, true);
+        }
+
+        private void DecompressionDirectory(string targetPath, string decompressionPath)
+        {
+            Directory.CreateDirectory(decompressionPath);
+            var files = Directory.GetFiles(targetPath);
+            foreach (var file in files)
+            {
+                var fileName = Path.GetFileNameWithoutExtension(file);
+                ZipFile.ExtractToDirectory(file, decompressionPath + Path.DirectorySeparatorChar + fileName, false);
             }
         }
 

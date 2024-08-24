@@ -9,7 +9,7 @@ namespace SlackExport.Service
     public class FileExportService
     {
         // TODO:App.configに移す想定
-        private static readonly string ROOT_PATH = "./work";
+        private static readonly string ROOT_PATH = "./exportwork";
 
         private static readonly string EXPORT_NAME = "第一システム部（仮） Slack export";
 

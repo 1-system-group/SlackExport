@@ -14,9 +14,9 @@ namespace SlackExport.Common
         public bool Insert(DataDto dataDto)
         {
             // 実行するSQL
-            var sql = "INSERT INTO diary (id, title, content, post_date, update_date)  SELECT MAX(id) + 1, @title, @content, @post_date, @update_date FROM diary";
+            var sql = "INSERT INTO diary (id, title, content, post_date, update_date)  SELECT COALESCE(MAX(id), 0) + 1, @title, @content, @post_date, @update_date FROM diary";
 
-            using (var connection = new MySqlConnection(ConfigurationManager.AppSettings["mySqlConnection"]))
+            using (var connection = new MySqlConnection(Environment.GetEnvironmentVariable("mySqlConnection")))
             {
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -53,7 +53,7 @@ namespace SlackExport.Common
         {
             // 実行するSQL
             string sql = "SELECT COUNT(*) AS count FROM diary WHERE title = @title";
-            using (var connection = new MySqlConnection(ConfigurationManager.AppSettings["mySqlConnection"]))
+            using (var connection = new MySqlConnection(Environment.GetEnvironmentVariable("mySqlConnection")))
             {
                 using (var command = new MySqlCommand(sql, connection))
                 {
