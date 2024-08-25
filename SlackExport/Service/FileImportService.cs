@@ -31,7 +31,6 @@ namespace SlackExport.Service
 
         public void Execute()
         {
-
             // S3からダウンロードしてきたファイルを格納するパスを作成
             Directory.CreateDirectory(S3_DOWNLOAD_TEMPORARY_PATH);
             // S3からダウンロード
@@ -43,7 +42,7 @@ namespace SlackExport.Service
            
             // ダウンロードしてきたファイルを全て解凍する
             DecompressionDirectory(S3_DOWNLOAD_TEMPORARY_PATH, S3_DOWNLOAD_TEMPORARY_PATH_DECOMPRESS);
-
+            
             var fileDtoList = new List<FileDto>();
             // ファイル格納パスを読み込んで、ファイルのリストを作成する
             Read("", S3_DOWNLOAD_TEMPORARY_PATH_DECOMPRESS, fileDtoList);
@@ -243,7 +242,7 @@ namespace SlackExport.Service
             // あらかじめ問い合わせておくようなことはしない
             if (userInfoDec == null)
             {
-                string token = ConfigurationManager.AppSettings["token"];
+                string token = Environment.GetEnvironmentVariable("SLACK_TOKEN");
                 var slackApiAccess = new SlackApiAccess();
                 userInfoDec = slackApiAccess.GetUserInfo(token);
             }
