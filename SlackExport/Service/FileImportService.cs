@@ -62,10 +62,10 @@ namespace SlackExport.Service
                 {
                     // 別のアーカイブファイルで同じ投稿データがある可能性があるので、
                     // 同じ投稿データがあったら除外するため、判定要素としてdataDtoListも渡す
-                    var devrlipRegistDataDtoList = DevelopRegst(fileDto, titleList, dataDtoList);
-                    if (devrlipRegistDataDtoList.Count > 0)
+                    var developRegistDataDtoList = getRegistDataList(fileDto, titleList, dataDtoList);
+                    if (developRegistDataDtoList.Count > 0)
                     {
-                        dataDtoList.AddRange(devrlipRegistDataDtoList);
+                        dataDtoList.AddRange(developRegistDataDtoList);
                     }
                 }
                 // github通知チャンネル
@@ -82,7 +82,7 @@ namespace SlackExport.Service
             }
 
             // diaryテーブルにインポートする
-            dbAccess.InsertsDiary(dataDtoList);
+            dbAccess.InsertDiaryList(dataDtoList);
 
             // S3からダウンロードしてきたファイルを格納するパス（解凍した分も含めて）を削除
             Directory.Delete(S3_DOWNLOAD_TEMPORARY_PATH, true);
@@ -130,7 +130,7 @@ namespace SlackExport.Service
         }
 
         // 開発チャンネル分のインポート
-        private List<DataDto> DevelopRegst(FileDto fileDto, List<string> titleList, List<DataDto> dataDtoList)
+        private List<DataDto> getRegistDataList(FileDto fileDto, List<string> titleList, List<DataDto> dataDtoList)
         {
             var registDataDtoList = new List<DataDto>();
             try
