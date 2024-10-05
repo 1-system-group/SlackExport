@@ -5,6 +5,7 @@
         public string thread { get; set; }
         public string ts { get; set; }
         public string user { get; set; }
+        public string title { get; set; }
         public string message { get; set; }
     }
 }
