@@ -62,7 +62,7 @@ namespace SlackExport.Service
                 {
                     // 別のアーカイブファイルで同じ投稿データがある可能性があるので、
                     // 同じ投稿データがあったら除外するため、判定要素としてdataDtoListも渡す
-                    var developRegistDataDtoList = getRegistDataList(fileDto, titleList, dataDtoList);
+                    var developRegistDataDtoList = GetRegistDataList(fileDto, titleList, dataDtoList);
                     if (developRegistDataDtoList.Count > 0)
                     {
                         dataDtoList.AddRange(developRegistDataDtoList);
@@ -130,7 +130,7 @@ namespace SlackExport.Service
         }
 
         // 開発チャンネル分のインポート
-        private List<DataDto> getRegistDataList(FileDto fileDto, List<string> titleList, List<DataDto> dataDtoList)
+        private List<DataDto> GetRegistDataList(FileDto fileDto, List<string> titleList, List<DataDto> dataDtoList)
         {
             var registDataDtoList = new List<DataDto>();
             try
@@ -208,7 +208,7 @@ namespace SlackExport.Service
                             {
                                 // 保持しておいたuserにも見つからない場合、
                                 // SlackAPIからユーザ名を取得する
-                                string slackApiName = getUserFromSlack(user);
+                                string slackApiName = GetUserFromSlack(user);
                                 if (slackApiName != string.Empty)
                                 {
                                     name = slackApiName;
@@ -256,7 +256,7 @@ namespace SlackExport.Service
 
         }
 
-        private string getUserFromSlack(string userId)
+        private string GetUserFromSlack(string userId)
         {
             string userName = string.Empty;
 
