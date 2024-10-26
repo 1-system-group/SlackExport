@@ -1,5 +1,4 @@
-﻿using System;
-using System.Configuration;
+﻿using System.Data;
 using MySqlConnector;
 using NLog;
 using SlackExport.Dto;
@@ -11,11 +10,10 @@ namespace SlackExport.Common
         // ログを出力するロガー定義
         public static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public bool Insert(DataDto dataDto)
+        public List<string> SelectRegisteredDiaryTitleList()
         {
             // 実行するSQL
-            var sql = " INSERT INTO diary (title, content, post_date, update_date) VALUES (@title, @content, @post_date, @update_date)";
-
+            string sql = "SELECT title AS title FROM diary";
             using (var connection = new MySqlConnection(Environment.GetEnvironmentVariable("MY_SQL_CONNECTION")))
             {
                 using (var command = new MySqlCommand(sql, connection))
@@ -26,76 +24,73 @@ namespace SlackExport.Common
                         connection.Open();
                         command.Connection = connection;
                         command.CommandText = sql;
-                        // バインド変数をセット
-                        // タイトルは「チャンネル名 + 日時 + ユーザ名」の形式にする
-                        command.Parameters.AddWithValue("@title", dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user);
-                        command.Parameters.AddWithValue("@content", dataDto.message);
-                        command.Parameters.AddWithValue("@post_date", dataDto.ts);
-                        command.Parameters.AddWithValue("@update_date", dataDto.ts);
 
-                        var result = command.ExecuteNonQuery();
-                        if (result != 1)
-                        {
-                            logger.Error("insert文でエラー。タイトル：" + dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user);
-                        }
-                        connection.Close();
+
+                        var dataTable = new DataTable();
+                        dataTable.Load(command.ExecuteReader());
+
+                        var list = dataTable.AsEnumerable().Select(x => x["title"].ToString()).ToList();
+
+                        return list;
+
                     }
                     catch (Exception ex)
                     {
-                        logger.Error("insert文発行で例外エラー。タイトル：" + dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user + " エラー内容：" + ex.Message + " スタックトレース：" + ex.StackTrace);
+                        logger.Error("登録済みタイトル一括取得のselect文発行で例外エラー。 エラー内容：" + ex.Message + " スタックトレース：" + ex.StackTrace);
                     }
+
                 }
             }
-            return true;
+            return [];
         }
 
-        public bool CheckRegistered(DataDto dataDto)
+
+        public void InsertDiaryList(List<DataDto> dataDtoList)
         {
-            // 実行するSQL
-            string sql = "SELECT COUNT(*) AS count FROM diary WHERE title = @title";
+            int insertNum = dataDtoList.Count;
+
+            if (insertNum == 0)
+            {
+                return;
+            }
+
             using (var connection = new MySqlConnection(Environment.GetEnvironmentVariable("MY_SQL_CONNECTION")))
             {
-                using (var command = new MySqlCommand(sql, connection))
+                // 接続の確立
+                connection.Open();
+
+                var insertSql = " INSERT INTO diary (title, content, post_date) VALUES " +
+                    string.Join(",", dataDtoList.Select((_, index) => $"(@title{index + 1}, @content{index + 1}, @post_date{index + 1})"));
+
+                using (var command = new MySqlCommand(insertSql, connection))
                 {
                     try
                     {
-                        // 接続の確立
-                        connection.Open();
                         command.Connection = connection;
-                        command.CommandText = sql;
+                        command.CommandText = insertSql;
 
-                        // タイトル
-                        string title = dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user;
-
-                        // バインド変数をセット
-                        command.Parameters.AddWithValue("@title", title);
-
-                        using (var reader = command.ExecuteReader())
+                        int valRowNum = 1;
+                        foreach (var insertDataDto in dataDtoList)
                         {
-                            if (reader.Read())
-                            {
-
-                                if (int.Parse(reader["count"].ToString()) > 0)
-                                {
-                                    logger.Info("登録済み：" + title);
-                                    return true;
-                                }
-                            }
-                            else
-                            {
-                                logger.Error("select文でエラー。：" + dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user);
-                                return true;
-                            }
+                            // バインド変数をセット
+                            command.Parameters.AddWithValue("@title" + valRowNum, insertDataDto.title);
+                            command.Parameters.AddWithValue("@content" + valRowNum, insertDataDto.message);
+                            command.Parameters.AddWithValue("@post_date" + valRowNum, insertDataDto.ts);
+                            valRowNum++;
                         }
-
+                        var result = command.ExecuteNonQuery();
+                        if (result == 0)
+                        {
+                            logger.Error("insert文でエラー");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        logger.Error("select文発行で例外エラー。タイトル：" + dataDto.thread + "_" + dataDto.ts + "_" + dataDto.user + " エラー内容：" + ex.Message + " スタックトレース：" + ex.StackTrace);
+                        logger.Error("insert文発行で例外エラー。 エラー内容：" + ex.Message + " スタックトレース：" + ex.StackTrace);
                     }
-
-                    return false;
                 }
+
+                connection.Close();
             }
         }
     }

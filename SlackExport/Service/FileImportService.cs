@@ -1,4 +1,5 @@
 ﻿using System.Configuration;
+using System.Data;
 using System.IO.Compression;
 using System.Text;
 using System.Web;
@@ -31,6 +32,7 @@ namespace SlackExport.Service
 
         public void Execute()
         {
+
             // S3からダウンロードしてきたファイルを格納するパスを作成
             Directory.CreateDirectory(S3_DOWNLOAD_TEMPORARY_PATH);
             // S3からダウンロード
@@ -39,21 +41,32 @@ namespace SlackExport.Service
                                 S3_DOWNLOAD_TEMPORARY_PATH,
                                 ConfigurationManager.AppSettings["awsBucketName"],
                                 ConfigurationManager.AppSettings["awsObjectPath"]);
-           
+
             // ダウンロードしてきたファイルを全て解凍する
             DecompressionDirectory(S3_DOWNLOAD_TEMPORARY_PATH, S3_DOWNLOAD_TEMPORARY_PATH_DECOMPRESS);
-            
+
             var fileDtoList = new List<FileDto>();
             // ファイル格納パスを読み込んで、ファイルのリストを作成する
             Read("", S3_DOWNLOAD_TEMPORARY_PATH_DECOMPRESS, fileDtoList);
 
-            // ファイルリストを1つずつ読み込んでインポートしていく
+            // 登録済みの日記（のタイトル）を取得する
+            var dbAccess = new DbAccess();
+            var titleList = dbAccess.SelectRegisteredDiaryTitleList();
+
+            var dataDtoList = new List<DataDto>();
+            // ファイルリストを1つずつ読み込んでインポートするリストを作成する
             foreach (var fileDto in fileDtoList)
             {
                 // 開発チャンネル
                 if (fileDto.channnelName == "開発")
                 {
-                    DevelopRegst(fileDto);
+                    // 別のアーカイブファイルで同じ投稿データがある可能性があるので、
+                    // 同じ投稿データがあったら除外するため、判定要素としてdataDtoListも渡す
+                    var developRegistDataDtoList = GetRegistDataList(fileDto, titleList, dataDtoList);
+                    if (developRegistDataDtoList.Count > 0)
+                    {
+                        dataDtoList.AddRange(developRegistDataDtoList);
+                    }
                 }
                 // github通知チャンネル
                 // ※ 現状未実装
@@ -67,6 +80,10 @@ namespace SlackExport.Service
                     logger.Info("スキップします。：" + fileDto.channnelName);
                 }
             }
+
+            // diaryテーブルにインポートする
+            dbAccess.InsertDiaryList(dataDtoList);
+
             // S3からダウンロードしてきたファイルを格納するパス（解凍した分も含めて）を削除
             Directory.Delete(S3_DOWNLOAD_TEMPORARY_PATH, true);
         }
@@ -113,8 +130,9 @@ namespace SlackExport.Service
         }
 
         // 開発チャンネル分のインポート
-        private void DevelopRegst(FileDto fileDto)
+        private List<DataDto> GetRegistDataList(FileDto fileDto, List<string> titleList, List<DataDto> dataDtoList)
         {
+            var registDataDtoList = new List<DataDto>();
             try
             {
                 //ファイルをオープンする
@@ -190,13 +208,13 @@ namespace SlackExport.Service
                             {
                                 // 保持しておいたuserにも見つからない場合、
                                 // SlackAPIからユーザ名を取得する
-                                string slackApiName = getUserFromSlack(user);
+                                string slackApiName = GetUserFromSlack(user);
                                 if (slackApiName != string.Empty)
                                 {
                                     name = slackApiName;
                                 }
                                 // SlackAPIに問い合わせても見つからなければuserを使う。
-                                else 
+                                else
                                 {
                                     name = user;
                                 }
@@ -204,15 +222,20 @@ namespace SlackExport.Service
                         }
 
                         dataDto.thread = fileDto.channnelName;
-                        dataDto.user = name;
                         dataDto.ts = ts;
+                        dataDto.user = name;
+                        // diaryテーブルにインポートするタイトル
+                        // タイトルは「チャンネル名 + 年月日時分秒(ミリナノ) + ユーザ名」の形式にする
+                        dataDto.title = fileDto.channnelName + "_" + ts + "_" + name;
                         dataDto.message = text;
 
-                        var dbAccess = new DbAccess();
-                        // すでにインポート済でなければインポートする
-                        if (dbAccess.CheckRegistered(dataDto) == false)
+                        // diaryテーブルに登録済みならスキップする
+                        // また、dataDtoListにすでに積んであるデータと重複していた場合もスキップする
+                        // それ以外ならdiaryテーブルに登録対象のデータとしてリストに積む
+                        if (!titleList.Contains(dataDto.title) &&
+                            (dataDtoList.Where(x => x.title == dataDto.title).Count() == 0))
                         {
-                            dbAccess.Insert(dataDto);
+                            registDataDtoList.Add(dataDto);
                         }
                     }
                 }
@@ -222,6 +245,8 @@ namespace SlackExport.Service
             {
                 logger.Error(fileDto.filePath + "読み込みで例外エラー。 エラー内容：" + ex.Message + " スタックトレース：" + ex.StackTrace);
             }
+
+            return registDataDtoList;
         }
 
         // github通知チャンネル分のインポート
@@ -231,8 +256,7 @@ namespace SlackExport.Service
 
         }
 
-
-        private string getUserFromSlack(string userId)
+        private string GetUserFromSlack(string userId)
         {
             string userName = string.Empty;
 
