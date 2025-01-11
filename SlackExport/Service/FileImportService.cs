@@ -167,7 +167,7 @@ namespace SlackExport.Service
 
                         // 整数部を取得して年月日時分秒に変換する
                         long.TryParse(tsWork.Split('.')[0], out longTs);
-                        string dateTime = unixEpoch.AddSeconds(longTs).ToLocalTime().ToString();
+                        string dateTime = unixEpoch.AddSeconds(longTs).ToLocalTime().ToString("yyyy/MM/dd HH:mm:ss");
 
                         // 小数点以下（ミリ秒とマイクロ秒）を取得する
                         string microSecoond = tsWork.Split('.')[1];
